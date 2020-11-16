@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <PropertyGroup>
+    <LangVersion>preview</LangVersion>
+    <TargetFramework>net5.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <NoWarn>CS1591,CS1998,NU5105,NU1603</NoWarn>
+    <GenerateFullPaths>true</GenerateFullPaths>
+    <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)'))</RepoRoot>
+    <PackageOutputPath>$(MSBuildThisFileDirectory)/nupkg</PackageOutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <RootNamespace>$(ProjectName)</RootNamespace>
+    <Title>$(ProjectName)</Title>
+    <Description>$(ProjectName)</Description>
+    <BuildVersion>1</BuildVersion>
+    <VersionPrefix>0.0.4</VersionPrefix>
+    <VersionSuffix></VersionSuffix>
+    <Version>$(VersionPrefix)$(VersionSuffix).$(BuildVersion)</Version>
+    <AssemblyVersion>$(VersionPrefix).$(BuildVersion)</AssemblyVersion>
+    <FileVersion>$(AssemblyVersion)</FileVersion>
+    <Authors>Lyrise</Authors>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/lyrise/emv-cs</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/lyrise/emv-cs</RepositoryUrl>
+    <PackageTags>Rename</PackageTags>
+    <Copyright>Copyright (c) 2020 Lyrise</Copyright>
+    <RepositoryType>git</RepositoryType>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <!-- Autodetect platform -->
+  <PropertyGroup Condition=" '$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))' ">
+    <NativeDepsPlatform>Windows</NativeDepsPlatform>
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' ">
+    <NativeDepsPlatform>Mac</NativeDepsPlatform>
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Linux)))' ">
+    <NativeDepsPlatform>Linux</NativeDepsPlatform>
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(NativeDepsPlatform)' == 'Windows' ">
+    <BaseIntermediateOutputPath Condition=" '$(BaseIntermediateOutputPath)' == '' ">$(MSBuildThisFileDirectory)tmp\obj\win\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+    <BaseOutputPath Condition=" '$(BaseOutputPath)' == '' ">$(MSBuildThisFileDirectory)tmp\bin\win\$(MSBuildProjectName)\</BaseOutputPath>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(NativeDepsPlatform)' == 'Mac' ">
+    <BaseIntermediateOutputPath Condition=" '$(BaseIntermediateOutputPath)' == '' ">$(MSBuildThisFileDirectory)tmp\obj\mac\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+    <BaseOutputPath Condition=" '$(BaseOutputPath)' == '' ">$(MSBuildThisFileDirectory)tmp\bin\mac\$(MSBuildProjectName)\</BaseOutputPath>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(NativeDepsPlatform)' == 'Linux' ">
+    <BaseIntermediateOutputPath Condition=" '$(BaseIntermediateOutputPath)' == '' ">$(MSBuildThisFileDirectory)tmp\obj\linux\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+    <BaseOutputPath Condition=" '$(BaseOutputPath)' == '' ">$(MSBuildThisFileDirectory)tmp\bin\linux\$(MSBuildProjectName)\</BaseOutputPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(RuntimeIdentifier)' == '' ">
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RestoreLockedMode>true</RestoreLockedMode>
+    <DisableImplicitNuGetFallbackFolder>true</DisableImplicitNuGetFallbackFolder>
+    <NuGetLockFilePath>packages.lock.json</NuGetLockFilePath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+    <PathMap>$(RepoRoot)=.</PathMap>
+  </PropertyGroup>
+
+</Project>
