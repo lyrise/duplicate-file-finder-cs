@@ -1,4 +1,4 @@
-
+using System.Threading;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -11,8 +11,6 @@ using DuplicateFileFinder.Models;
 using DuplicateFileFinder.Repositories;
 using LiteDB;
 using ShellProgressBar;
-using YamlDotNet.Serialization;
-using YamlDotNet.Serialization.NamingConventions;
 
 namespace DuplicateFileFinder
 {
@@ -32,11 +30,11 @@ namespace DuplicateFileFinder
             _fileMetaRepository = new FileMetaRepository(_database);
         }
 
-        public async Task FindAndDeleteAsync(bool isDeleteEnabled)
+        public async Task FindAndDeleteAsync(bool isDeleteEnabled, CancellationToken cancellationToken = default)
         {
-            var foundFiles = this.GetFiles();
-            var filteredFiles = this.FilterFilesByDuplicateSize(foundFiles);
-            var groupedFiles = this.GroupFilesByHashValue(filteredFiles);
+            var foundFiles = this.GetFiles(cancellationToken);
+            var filteredFiles = this.FilterFilesByDuplicateSize(foundFiles, cancellationToken);
+            var groupedFiles = this.GroupFilesByHashValue(filteredFiles, cancellationToken);
 
             await Console.Out.WriteLineAsync("FoundFiles: " + foundFiles.Count());
             await Console.Out.WriteLineAsync("FilteredFiles: " + filteredFiles.Count());
@@ -50,114 +48,128 @@ namespace DuplicateFileFinder
                 foreach (var deleteFile in files.Skip(1))
                 {
                     await Console.Out.WriteLineAsync($"D {deleteFile}");
+
                     if (isDeleteEnabled)
                     {
-
+                        File.Delete(deleteFile);
                     }
                 }
             }
         }
 
-        private IEnumerable<string> GetFiles()
+        private IEnumerable<string> GetFiles(CancellationToken cancellationToken = default)
         {
             var results = new List<string>();
             var hashSet = new HashSet<string>();
 
             foreach (var pattern in _config.DirectoryPathPatterns ?? Array.Empty<string>())
             {
+                var tempResults = new List<string>();
+
                 foreach (var fileSystemInfo in Ganss.IO.Glob.Expand(pattern))
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     bool isDirectory = fileSystemInfo.Attributes.HasFlag(FileAttributes.Directory);
                     if (isDirectory)
                     {
                         continue;
                     }
 
+                    if (fileSystemInfo.FullName is null)
+                    {
+                        continue;
+                    }
+
                     if (hashSet.Add(fileSystemInfo.FullName))
                     {
-                        results.Add(fileSystemInfo.FullName);
-                    }
-                }
-            }
-
-            results.Sort();
-            return results.ToArray();
-        }
-
-        private IEnumerable<string> FilterFilesByDuplicateSize(IEnumerable<string> files)
-        {
-            var options = new ProgressBarOptions
-            {
-                DisplayTimeInRealTime = false
-            };
-            using (var pbar = new ProgressBar(files.Count(), "FilterFilesByDuplicateSize", options))
-            {
-                var results = new HashSet<string>();
-                var map = new Dictionary<long, string?>();
-
-                foreach (var path in files)
-                {
-                    var key = new FileInfo(path).Length;
-                    pbar.Tick();
-
-                    if (!map.TryAdd(key, path))
-                    {
-                        results.Add(path);
-
-                        var addedPath = map.GetValueOrDefault(key);
-                        if (addedPath is not null)
-                        {
-                            results.Add(addedPath);
-                        }
-                        map[key] = null;
+                        tempResults.Add(fileSystemInfo.FullName);
                     }
                 }
 
-                return results.ToArray();
+                tempResults.Sort();
+                results.AddRange(tempResults);
             }
+
+            return results;
         }
 
-        private IEnumerable<string[]> GroupFilesByHashValue(IEnumerable<string> files)
+        private IEnumerable<string> FilterFilesByDuplicateSize(IEnumerable<string> files, CancellationToken cancellationToken = default)
         {
             var options = new ProgressBarOptions
             {
-                DisplayTimeInRealTime = false
+                ProgressCharacter = '-',
+                ProgressBarOnBottom = true
             };
-            using (var pbar = new ProgressBar(files.Count(), "GroupFilesByHashValue", options))
+            using var pbar = new ProgressBar(files.Count(), "Initial message", options);
+            var map = new ConcurrentDictionary<long, List<string>>();
+
+            foreach (var (i, path) in files.Select((n, i) => (i, n)))
             {
-                var map = new ConcurrentDictionary<byte[], List<string>>(new ByteArrayEqualityComparer());
+                cancellationToken.ThrowIfCancellationRequested();
+                pbar.Tick(i, $"FilterFilesByDuplicateSize {pbar.CurrentTick} / {pbar.MaxTicks}");
 
-                foreach (var path in files)
-                {
-                    var meta = this.GetFileMeta(path);
-                    var list = map.GetOrAdd(meta.Sha256HashValue, _ => new List<string>());
-                    list.Add(path);
-
-                    pbar.Tick();
-                }
-
-                return map.Select(n => n.Value.ToArray()).ToArray();
+                var key = new FileInfo(path).Length;
+                var list = map.GetOrAdd(key, _ => new List<string>());
+                list.Add(path);
             }
+
+            return map.Where(n => n.Value.Count > 1).SelectMany(n => n.Value).ToArray();
         }
 
-        private FileMeta GetFileMeta(string filePath)
+        private IEnumerable<string[]> GroupFilesByHashValue(IEnumerable<string> files, CancellationToken cancellationToken = default)
         {
-            var meta = _fileMetaRepository.Get(filePath);
+            var options = new ProgressBarOptions
+            {
+                ProgressCharacter = '-',
+                ProgressBarOnBottom = true
+            };
+            using var pbar = new ProgressBar(files.Count(), "Initial message", options);
+            var map = new ConcurrentDictionary<byte[], List<string>>(new ByteArrayEqualityComparer());
+
+            foreach (var (i, path) in files.Select((n, i) => (i, n)))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                pbar.Tick(i, $"GroupFilesByHashValue {pbar.CurrentTick} / {pbar.MaxTicks}");
+
+                var meta = this.GetFileMeta(path);
+                if (meta is null)
+                {
+                    continue;
+                }
+
+                var list = map.GetOrAdd(meta.Sha256HashValue!, _ => new List<string>());
+                list.Add(path);
+            }
+
+            return map.Where(n => n.Value.Count > 1).Select(n => n.Value.ToArray()).ToArray();
+        }
+
+        private FileMeta? GetFileMeta(string filePath)
+        {
+            var meta = _fileMetaRepository.Find(filePath);
 
             if (meta == null)
             {
-                var fileInfo = new FileInfo(filePath);
-
-                using var stream = new FileStream(filePath, FileMode.Open);
-                using var hash = SHA256.Create();
-                var sha256HashValue = hash.ComputeHash(stream);
-
-                meta = new FileMeta()
+                try
                 {
-                    FullPath = filePath,
-                    LastWriteTimeUtc = fileInfo.LastWriteTimeUtc,
-                    Sha256HashValue = sha256HashValue
-                };
+                    var fileInfo = new FileInfo(filePath);
+
+                    using var stream = new FileStream(filePath, FileMode.Open);
+                    using var hash = SHA256.Create();
+                    var sha256HashValue = hash.ComputeHash(stream);
+
+                    meta = new FileMeta()
+                    {
+                        FullPath = filePath,
+                        LastWriteTimeUtc = fileInfo.LastWriteTimeUtc,
+                        Sha256HashValue = sha256HashValue
+                    };
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    return null;
+                }
 
                 _fileMetaRepository.Upsert(meta);
             }
@@ -169,6 +181,16 @@ namespace DuplicateFileFinder
         {
             public bool Equals(byte[]? x, byte[]? y)
             {
+                if (x is null || y is null)
+                {
+                    if (x is null && y is null)
+                    {
+                        return true;
+                    }
+
+                    return false;
+                }
+
                 fixed (byte* px = x)
                 fixed (byte* py = y)
                 {

@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace DuplicateFileFinder
 {
-    class Program
+    class Program : CoconaLiteConsoleAppBase
     {
         static void Main(string[] args)
         {
@@ -22,7 +22,7 @@ namespace DuplicateFileFinder
             {
                 var currentDirectory = Directory.GetCurrentDirectory();
                 var finder = new DuplicateFileFinder(currentDirectory);
-                await finder.FindAndDeleteAsync(delete);
+                await finder.FindAndDeleteAsync(delete, this.Context.CancellationToken);
             }
             catch (Exception e)
             {

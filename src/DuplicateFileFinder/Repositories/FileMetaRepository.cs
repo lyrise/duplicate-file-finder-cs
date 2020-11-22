@@ -25,13 +25,13 @@ namespace DuplicateFileFinder.Repositories
             return _database.GetCollection<FileMeta>("file_meta");
         }
 
-        public IEnumerable<FileMeta> GetAll()
+        public IEnumerable<FileMeta> FindAll()
         {
             var collection = this.GetCollection();
             return collection.FindAll();
         }
 
-        public FileMeta? Get(string fullPath)
+        public FileMeta? Find(string fullPath)
         {
             var collection = this.GetCollection();
             return collection.Find(n => n.FullPath == fullPath).FirstOrDefault();

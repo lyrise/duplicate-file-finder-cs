@@ -10,7 +10,7 @@
     <NoWarn>CS1591,CS1998,NU5105,NU1603</NoWarn>
     <GenerateFullPaths>true</GenerateFullPaths>
     <RepoRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)'))</RepoRoot>
-    <PackageOutputPath>$(MSBuildThisFileDirectory)/nupkg</PackageOutputPath>
+    <PackageOutputPath>$(RepoRoot)/nupkg</PackageOutputPath>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -67,7 +67,7 @@
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <RestoreLockedMode>true</RestoreLockedMode>
     <DisableImplicitNuGetFallbackFolder>true</DisableImplicitNuGetFallbackFolder>
-    <NuGetLockFilePath>packages.lock.json</NuGetLockFilePath>
+    <NuGetLockFilePath>packages.lock.any.json</NuGetLockFilePath>
   </PropertyGroup>
 
   <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
