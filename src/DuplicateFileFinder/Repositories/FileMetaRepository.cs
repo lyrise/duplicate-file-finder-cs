@@ -40,7 +40,8 @@ namespace DuplicateFileFinder.Repositories
         public void Upsert(FileMeta meta)
         {
             var collection = this.GetCollection();
-            collection.Upsert(meta);
+            collection.DeleteMany(n => n.FullPath == meta.FullPath);
+            collection.Insert(meta);
         }
     }
 }

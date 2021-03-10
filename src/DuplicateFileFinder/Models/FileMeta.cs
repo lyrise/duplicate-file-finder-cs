@@ -9,7 +9,7 @@ namespace DuplicateFileFinder.Models
     {
         public string? FullPath { get; set; }
 
-        public DateTime LastWriteTimeUtc { get; set; }
+        public DateTime LastWriteTime { get; set; }
 
         public byte[]? Sha256HashValue { get; set; }
     }

@@ -149,30 +149,32 @@ namespace DuplicateFileFinder
         {
             var meta = _fileMetaRepository.Find(filePath);
 
-            if (meta == null)
+            if (meta is not null)
             {
-                try
-                {
-                    var fileInfo = new FileInfo(filePath);
-
-                    using var stream = new FileStream(filePath, FileMode.Open);
-                    using var hash = SHA256.Create();
-                    var sha256HashValue = hash.ComputeHash(stream);
-
-                    meta = new FileMeta()
-                    {
-                        FullPath = filePath,
-                        LastWriteTimeUtc = fileInfo.LastWriteTimeUtc,
-                        Sha256HashValue = sha256HashValue
-                    };
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    return null;
-                }
-
-                _fileMetaRepository.Upsert(meta);
+                return meta;
             }
+
+            try
+            {
+                var fileInfo = new FileInfo(filePath);
+
+                using var stream = new FileStream(filePath, FileMode.Open);
+                using var hash = SHA256.Create();
+                var sha256HashValue = hash.ComputeHash(stream);
+
+                meta = new FileMeta()
+                {
+                    FullPath = filePath,
+                    LastWriteTime = fileInfo.LastWriteTimeUtc,
+                    Sha256HashValue = sha256HashValue
+                };
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return null;
+            }
+
+            _fileMetaRepository.Upsert(meta);
 
             return meta;
         }
