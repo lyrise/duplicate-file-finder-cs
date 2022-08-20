@@ -1,3 +1,3 @@
 #!/bin/bash
 
-dotnet run -p ../src/DuplicateFileFinder -- -d
+dotnet run --project ../src/DuplicateFileFinder -- -d

@@ -1,17 +1,27 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <OutputType>Exe</OutputType>
-   </PropertyGroup>
+
+    <GenerateAssemblyFileVersionAttribute>false</GenerateAssemblyFileVersionAttribute>
+    <GenerateAssemblyInformationalVersionAttribute>false</GenerateAssemblyInformationalVersionAttribute>
+    <GenerateAssemblyVersionAttribute>false</GenerateAssemblyVersionAttribute>
+
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Cocona.Lite" Version="1.5.0" />
-    <PackageReference Include="Glob.cs" Version="5.0.224" />
-    <PackageReference Include="LiteDB" Version="5.0.9" />
-    <PackageReference Include="NLog" Version="4.7.4" />
-    <PackageReference Include="ShellProgressBar" Version="5.0.0" />
-    <PackageReference Include="YamlDotNet" Version="8.1.2" />
+    <PackageReference Include="Cocona.Lite" />
+    <PackageReference Include="LiteDB" />
+    <PackageReference Include="NLog" />
+    <PackageReference Include="ShellProgressBar" />
+    <PackageReference Include="YamlDotNet" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="NLog.config">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

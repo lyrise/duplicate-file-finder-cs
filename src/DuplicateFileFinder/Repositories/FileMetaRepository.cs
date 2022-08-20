@@ -1,16 +1,13 @@
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using DuplicateFileFinder.Models;
 using LiteDB;
-using YamlDotNet.Serialization;
-using YamlDotNet.Serialization.NamingConventions;
 
 namespace DuplicateFileFinder.Repositories
 {
     public class FileMetaRepository
     {
         private readonly LiteDatabase _database;
+
+        private readonly object _lockObject = new();
 
         public FileMetaRepository(LiteDatabase database)
         {
@@ -27,21 +24,30 @@ namespace DuplicateFileFinder.Repositories
 
         public IEnumerable<FileMeta> FindAll()
         {
-            var collection = this.GetCollection();
-            return collection.FindAll();
+            lock (_lockObject)
+            {
+                var col = this.GetCollection();
+                return col.FindAll();
+            }
         }
 
         public FileMeta? Find(string fullPath)
         {
-            var collection = this.GetCollection();
-            return collection.Find(n => n.FullPath == fullPath).FirstOrDefault();
+            lock (_lockObject)
+            {
+                var col = this.GetCollection();
+                return col.Find(n => n.FullPath == fullPath).FirstOrDefault();
+            }
         }
 
         public void Upsert(FileMeta meta)
         {
-            var collection = this.GetCollection();
-            collection.DeleteMany(n => n.FullPath == meta.FullPath);
-            collection.Insert(meta);
+            lock (_lockObject)
+            {
+                var col = this.GetCollection();
+                col.DeleteMany(n => n.FullPath == meta.FullPath);
+                col.Insert(meta);
+            }
         }
     }
 }

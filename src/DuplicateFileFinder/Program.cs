@@ -1,16 +1,11 @@
-﻿using System.Linq;
-using System.IO;
-using System;
-using System.Collections.Generic;
-using Cocona;
-using DuplicateFileFinder;
-using DuplicateFileFinder.Models;
-using System.Threading.Tasks;
+﻿using Cocona;
 
 namespace DuplicateFileFinder
 {
     class Program : CoconaLiteConsoleAppBase
     {
+        private static readonly NLog.Logger _logger = NLog.LogManager.GetCurrentClassLogger();
+
         static void Main(string[] args)
         {
             CoconaLiteApp.Run<Program>(args);
@@ -26,7 +21,7 @@ namespace DuplicateFileFinder
             }
             catch (Exception e)
             {
-                Console.WriteLine(e.ToString());
+                _logger.Error(e);
             }
         }
     }

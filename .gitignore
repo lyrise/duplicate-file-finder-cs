@@ -1,11 +1,19 @@
 # Custom
 tmp/
 pub/
-nupkg/
 patch.txt
 
+# Environment
+.env
+
+# Mono
+mono_crash.*
+
 # Visual Studio Code
-.vscode/
+.vscode/*
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/settings.json
 
 # Tool Runtime Dir
 /[Tt]ools/

@@ -1,0 +1,16 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "DuplicateFileFinder (win)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/tmp/bin/win-vscode/DuplicateFileFinder/Debug/net6.0/DuplicateFileFinder.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}/demo",
+            "console": "internalConsole",
+            "stopAtEntry": false
+        }
+    ]
+}

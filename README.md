@@ -1,5 +1,1 @@
-# duplicate-file-finder
-
-## Install
-
-## Usage
+# Duplicate File Finder

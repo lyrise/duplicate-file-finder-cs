@@ -1,12 +1,6 @@
-using System.Threading;
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.IO;
-using System.Linq;
 using System.Security.Cryptography;
-using System.Threading.Tasks;
 using DuplicateFileFinder.Models;
 using DuplicateFileFinder.Repositories;
 using LiteDB;
@@ -20,21 +14,22 @@ namespace DuplicateFileFinder
         const string DatabaseFileName = "lite.db";
         private readonly Config _config;
         private readonly LiteDatabase _database;
-        private readonly FileMetaRepository _fileMetaRepository;
+        private readonly FileMetaRepository _fileMetaRepo;
+
+        private readonly object _lockObject = new();
 
         public DuplicateFileFinder(string configDirectoryPath)
         {
             _config = Config.LoadFile(Path.Combine(configDirectoryPath, ConfigFileName));
             _database = new LiteDatabase(Path.Combine(configDirectoryPath, DatabaseFileName));
-
-            _fileMetaRepository = new FileMetaRepository(_database);
+            _fileMetaRepo = new FileMetaRepository(_database);
         }
 
         public async Task FindAndDeleteAsync(bool isDeleteEnabled, CancellationToken cancellationToken = default)
         {
             var foundFiles = this.GetFiles(cancellationToken);
             var filteredFiles = this.FilterFilesByDuplicateSize(foundFiles, cancellationToken);
-            var groupedFiles = this.GroupFilesByHashValue(filteredFiles, cancellationToken);
+            var groupedFiles = await this.GroupFilesByHashValueAsync(filteredFiles, cancellationToken);
 
             await Console.Out.WriteLineAsync("FoundFiles: " + foundFiles.Count());
             await Console.Out.WriteLineAsync("FilteredFiles: " + filteredFiles.Count());
@@ -62,28 +57,17 @@ namespace DuplicateFileFinder
             var results = new List<string>();
             var hashSet = new HashSet<string>();
 
-            foreach (var pattern in _config.DirectoryPathPatterns ?? Array.Empty<string>())
+            foreach (var targetDir in _config.Targets ?? Array.Empty<string>())
             {
                 var tempResults = new List<string>();
 
-                foreach (var fileSystemInfo in Ganss.IO.Glob.Expand(pattern))
+                foreach (var path in Directory.EnumerateFiles(targetDir, "*", new EnumerationOptions() { RecurseSubdirectories = true }))
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    bool isDirectory = fileSystemInfo.Attributes.HasFlag(FileAttributes.Directory);
-                    if (isDirectory)
+                    if (hashSet.Add(path))
                     {
-                        continue;
-                    }
-
-                    if (fileSystemInfo.FullName is null)
-                    {
-                        continue;
-                    }
-
-                    if (hashSet.Add(fileSystemInfo.FullName))
-                    {
-                        tempResults.Add(fileSystemInfo.FullName);
+                        tempResults.Add(path);
                     }
                 }
 
@@ -98,7 +82,7 @@ namespace DuplicateFileFinder
         {
             var options = new ProgressBarOptions
             {
-                ProgressCharacter = '-',
+                ProgressCharacter = '#',
                 ProgressBarOnBottom = true
             };
             using var pbar = new ProgressBar(files.Count(), "Initial message", options);
@@ -107,7 +91,7 @@ namespace DuplicateFileFinder
             foreach (var (i, path) in files.Select((n, i) => (i, n)))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                pbar.Tick(i, $"FilterFilesByDuplicateSize {pbar.CurrentTick} / {pbar.MaxTicks}");
+                pbar.Tick(i, $"Compare file sizes {pbar.CurrentTick} / {pbar.MaxTicks}");
 
                 var key = new FileInfo(path).Length;
                 var list = map.GetOrAdd(key, _ => new List<string>());
@@ -117,42 +101,44 @@ namespace DuplicateFileFinder
             return map.Where(n => n.Value.Count > 1).SelectMany(n => n.Value).ToArray();
         }
 
-        private IEnumerable<string[]> GroupFilesByHashValue(IEnumerable<string> files, CancellationToken cancellationToken = default)
+        private async ValueTask<IEnumerable<string[]>> GroupFilesByHashValueAsync(IEnumerable<string> files, CancellationToken cancellationToken = default)
         {
             var options = new ProgressBarOptions
             {
-                ProgressCharacter = '-',
+                ProgressCharacter = '#',
                 ProgressBarOnBottom = true
             };
             using var pbar = new ProgressBar(files.Count(), "Initial message", options);
-            var map = new ConcurrentDictionary<byte[], List<string>>(new ByteArrayEqualityComparer());
+            var map = new ConcurrentDictionary<byte[], ConcurrentQueue<string>>(new ByteArrayEqualityComparer());
 
-            foreach (var (i, path) in files.Select((n, i) => (i, n)))
+            var lockObject = new object();
+            int current = 0;
+
+            var parallelOptions = new ParallelOptions() { MaxDegreeOfParallelism = 2 };
+            await Parallel.ForEachAsync(files, parallelOptions, async (path, token) =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                pbar.Tick(i, $"GroupFilesByHashValue {pbar.CurrentTick} / {pbar.MaxTicks}");
 
-                var meta = this.GetFileMeta(path);
-                if (meta is null)
+                lock (lockObject)
                 {
-                    continue;
+                    pbar.Tick(++current, $"Compare file hashes {pbar.CurrentTick} / {pbar.MaxTicks}");
                 }
 
-                var list = map.GetOrAdd(meta.Sha256HashValue!, _ => new List<string>());
-                list.Add(path);
-            }
+                var meta = this.GetFileMeta(path);
+                if (meta is null) return;
+
+                var queue = map.GetOrAdd(meta.Sha256HashValue!, _ => new ConcurrentQueue<string>());
+                queue.Enqueue(path);
+            });
 
             return map.Where(n => n.Value.Count > 1).Select(n => n.Value.ToArray()).ToArray();
         }
 
+
         private FileMeta? GetFileMeta(string filePath)
         {
-            var meta = _fileMetaRepository.Find(filePath);
-
-            if (meta is not null)
-            {
-                return meta;
-            }
+            var meta = _fileMetaRepo.Find(filePath);
+            if (meta is not null) return meta;
 
             try
             {
@@ -174,7 +160,7 @@ namespace DuplicateFileFinder
                 return null;
             }
 
-            _fileMetaRepository.Upsert(meta);
+            _fileMetaRepo.Upsert(meta);
 
             return meta;
         }
