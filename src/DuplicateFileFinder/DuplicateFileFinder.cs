@@ -16,8 +16,6 @@ namespace DuplicateFileFinder
         private readonly LiteDatabase _database;
         private readonly FileMetaRepository _fileMetaRepo;
 
-        private readonly object _lockObject = new();
-
         public DuplicateFileFinder(string configDirectoryPath)
         {
             _config = Config.LoadFile(Path.Combine(configDirectoryPath, ConfigFileName));
@@ -38,11 +36,11 @@ namespace DuplicateFileFinder
             foreach (var files in groupedFiles)
             {
                 var firstFile = files.First();
-                await Console.Out.WriteLineAsync($"S {firstFile}");
+                await Console.Out.WriteLineAsync($"S: {firstFile}");
 
                 foreach (var deleteFile in files.Skip(1))
                 {
-                    await Console.Out.WriteLineAsync($"D {deleteFile}");
+                    await Console.Out.WriteLineAsync($"D: {deleteFile}");
 
                     if (isDeleteEnabled)
                     {
@@ -109,31 +107,24 @@ namespace DuplicateFileFinder
                 ProgressBarOnBottom = true
             };
             using var pbar = new ProgressBar(files.Count(), "Initial message", options);
-            var map = new ConcurrentDictionary<byte[], ConcurrentQueue<string>>(new ByteArrayEqualityComparer());
+            var map = new ConcurrentDictionary<byte[], Queue<string>>(new ByteArrayEqualityComparer());
 
-            var lockObject = new object();
             int current = 0;
 
-            var parallelOptions = new ParallelOptions() { MaxDegreeOfParallelism = 2 };
-            await Parallel.ForEachAsync(files, parallelOptions, async (path, token) =>
+            foreach (var path in files)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-
-                lock (lockObject)
-                {
-                    pbar.Tick(++current, $"Compare file hashes {pbar.CurrentTick} / {pbar.MaxTicks}");
-                }
+                pbar.Tick(++current, $"Compare file hashes {pbar.CurrentTick} / {pbar.MaxTicks}");
 
                 var meta = this.GetFileMeta(path);
-                if (meta is null) return;
+                if (meta is null) continue;
 
-                var queue = map.GetOrAdd(meta.Sha256HashValue!, _ => new ConcurrentQueue<string>());
+                var queue = map.GetOrAdd(meta.Sha256HashValue!, _ => new Queue<string>());
                 queue.Enqueue(path);
-            });
+            }
 
             return map.Where(n => n.Value.Count > 1).Select(n => n.Value.ToArray()).ToArray();
         }
-
 
         private FileMeta? GetFileMeta(string filePath)
         {
